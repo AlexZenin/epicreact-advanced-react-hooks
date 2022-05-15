@@ -27,7 +27,7 @@ function asyncReducer(state, action) {
   }
 }
 
-function useAsync(initalState) {
+function useAsync(asyncCallback, initalState) {
   // TODO: Make PR to update this function signature since it's not the same
   //  as what's suggested.
   const [state, dispatch] = React.useReducer(asyncReducer, {
@@ -36,8 +36,12 @@ function useAsync(initalState) {
     error: null,
     ...initalState,
   })
-  
-  const run = React.useCallback((promise) => {
+
+  React.useEffect(() => {
+    const promise = asyncCallback()
+    if (!promise) {
+      return
+    }
     dispatch({type: 'pending'})
     promise.then(
       data => {
@@ -47,23 +51,24 @@ function useAsync(initalState) {
         dispatch({type: 'rejected', error})
       },
     )
-  }, [])
+  }, [asyncCallback])
 
-  return {...state, run}
+  return state
 }
 
 function PokemonInfo({pokemonName}) {
-  const {data, status, error, run} = useAsync({
-    status: pokemonName ? 'pending' : 'idle',
-  })
-
-  React.useEffect(() => {
+  const asyncPokemonFunction = React.useCallback(() => {
     if (!pokemonName) {
       return
     }
-    const pokemonPromise = fetchPokemon(pokemonName)
-    run(pokemonPromise)
-  }, [pokemonName, run])
+    return fetchPokemon(pokemonName)
+  }, [pokemonName])
+
+  const state = useAsync(asyncPokemonFunction, {
+    status: pokemonName ? 'pending' : 'idle',
+  })
+
+  const {data, status, error} = state
 
   switch (status) {
     case 'idle':
